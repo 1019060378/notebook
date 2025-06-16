@@ -25,6 +25,7 @@ function createChunk(file){
   }
   return chunkList;
 }
+3.上传切片
 
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
@@ -34,7 +35,7 @@ function createChunk(file){
 可以支持断点续传、断开重连重传、切片上传
 
 方案：
--前端切片 chunk 1024M(1024*1024 = 1048576 KB),每片500Kb,总片数 const size = 1048576 / 500
+-前端切片 chunk 2GB(2*1024 = 2048MB),每片10MB,总片数 const size = 2048 / 10
 -将切片传递给后端，切的片要取名：hash作为id，包含顺序index
 -后端组合切片
 
