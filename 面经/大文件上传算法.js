@@ -1,5 +1,6 @@
 代码
 1.js实现文件读取，监听input的change事件，获取文件size等信息备用
+import axios from 'axios';
 let input = document.getElementById('input');
 let upload = document.getElementById('upload');
 // 创建一个对象存储文件数据
@@ -27,37 +28,58 @@ function createChunk(file){
 }
 3.上传切片
 async function uploadFile(list){
-  const requestList = [];
-  requestList = list.map(({file,fileName,chunkName,index}) => {
+  // 最大并发任务为5个
+  const MAX_CONCURRENT_UPLOADS = 5;
+  let activeTask = 0;
+  let succeedTask = 0;
+  let failedTask = 0;
+  let currentIndex = 0;
+  while(activeTask < MAX_CONCURRENT_UPLOADS && currentTask < list.length){
+    const chunk = list[currentIndex];
+    activeTask++;
+    currentIndex++;
+    uploadChunk(chunk);
+  }
+  if(succeedTask + failedTask === list.length){
+     // 所有请求成功完成
+     console.log('所有切片上传成功')
+     // 调用合并接口，通知服务端合并切片
+     mergeChunks();
+  }
+
+// 上传单个分片
+async function uploadChunk(chunk){
     const formData = new FormData();//创建表单类型数据
-    formData.append('file', file);
-    formData.append('fileName', fileName);
-    formData.append('chunkName', chunkName);
-    return {formData, index}
-  })
- Promise.all(
-  requestList.map(data => 
-    axios.post('/api/upload', data, {
+    formData.append('file', chunk.file);
+    formData.append('fileName', chunk.fileName);
+    formData.append('chunkName', chunk.chunkName);
+await axios.post('/api/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data' // 让 axios 自动设置 boundary
       }
-    })
-  )
-)
+})
 .then(responses => {
-  // 所有请求成功完成
-  console.log('所有切片上传成功')
-  // 调用合并接口，通知服务端合并切片
-  axios.post('/api/merge', {
-    fileName: files.name,
-    total: list.length
-  })
+ console.log(`第${chunk.index}切片上传成功`)
+  succeedTask--;
 })
 .catch(error => {
-  // 任何一个请求失败都会进入这里
-  console.error('至少一个上传失败:', error);
+  console.log(`第${chunk.index}切片上传失败`)
+  failedTask ++;
+}).finally(() =>{
+  activeTask --;
 });
 }
+}
+
+function mergeChunks(){
+  axios.post('/api/merge', {
+    fileName: files.name,
+    total: uploadList.length
+  }).then().catch(error => {
+    console.log('文件合并失败', error);
+  })
+}
+
 upload.addEventListener(click => {
   const uploadList = chunkList.map(({file}, index) => {
     file,
