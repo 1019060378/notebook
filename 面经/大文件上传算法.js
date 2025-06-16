@@ -1,3 +1,17 @@
+代码
+1.js实现文件读取，监听input的change事件，获取文件size等信息备用
+let input = document.getElementById('input');
+// 创建一个对象存储文件数据
+let files = {}
+input.addEventListener('change', (e) => {
+  files = e.target.files[0];
+})
+2.创建切片
+function createChunk(file, size){ // size切片大小2MB
+  
+}
+
+
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
 2.传输过程中网络波动
