@@ -1,31 +1,73 @@
 代码
 1.js实现文件读取，监听input的change事件，获取文件size等信息备用
 let input = document.getElementById('input');
+let upload = document.getElementById('upload');
 // 创建一个对象存储文件数据
 let files = {}
 // 存放切片的数据
 let chunkList = []
+// 一个切片大小10MB
+const CHUNK_SIZE = 10 * 1024;
 input.addEventListener('change', (e) => {
   files = e.target.files[0];
   // 调用创建切片
   chunkList = createChunk(files);
-  // 调用上传切片
 })
 2.创建切片
-// size是一个切片大小10MB
-let size = 10*1024*1024;
 function createChunk(file){ 
   const chunkList = [];
   let cur = 0;
   while(cur < file.size){ // file.size有给定值，就进行替换
     chunkList.push({
-      file: file.slice(cur, cur + size)
+      file: file.slice(cur, cur + CHUNK_SIZE)
     })
-    cur += size;
+    cur += CHUNK_SIZE;
   }
   return chunkList;
 }
 3.上传切片
+async function uploadFile(list){
+  const requestList = [];
+  requestList = list.map(({file,fileName,chunkName,index}) => {
+    const formData = new FormData();//创建表单类型数据
+    formData.append('file', file);
+    formData.append('fileName', fileName);
+    formData.append('chunkName', chunkName);
+    return {formData, index}
+  })
+ Promise.all(
+  requestList.map(data => 
+    axios.post('/api/upload', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data' // 让 axios 自动设置 boundary
+      }
+    })
+  )
+)
+.then(responses => {
+  // 所有请求成功完成
+  console.log('所有切片上传成功')
+  // 调用合并接口，通知服务端合并切片
+  axios.post('/api/merge', {
+    fileName: files.name,
+    total: list.length
+  })
+})
+.catch(error => {
+  // 任何一个请求失败都会进入这里
+  console.error('至少一个上传失败:', error);
+});
+}
+upload.addEventListener(click => {
+  const uploadList = chunkList.map(({file}, index) => {
+    file,
+    fileName: file.name,
+    chunkName: `${file.name}_${index}`,
+    size: file.size
+    index
+  })
+  await uploadFile(uploadList);
+})
 
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
