@@ -7,8 +7,8 @@ let upload = document.getElementById('upload');
 let files = {}
 // 存放切片的数据
 let chunkList = []
-// 一个切片大小10MB
-const CHUNK_SIZE = 10 * 1024;
+// 一个切片大小10MB，单位是Byte
+const CHUNK_SIZE = 10 * 1024 *1024;
 input.addEventListener('change', (e) => {
   files = e.target.files[0];
   // 调用创建切片
@@ -18,7 +18,7 @@ input.addEventListener('change', (e) => {
 function createChunk(file){ 
   const chunkList = [];
   let cur = 0;
-  while(cur < file.size){ // file.size有给定值，就进行替换
+  while(cur < file.size){ // file.size有给定值，就进行替换，单位需要统一
     chunkList.push({
       file: file.slice(cur, cur + CHUNK_SIZE)
     })
@@ -34,7 +34,7 @@ async function uploadFile(list){
   let succeedTask = 0;
   let failedTask = 0;
   let currentIndex = 0;
-  while(activeTask < MAX_CONCURRENT_UPLOADS && currentTask < list.length){
+  while(activeTask < MAX_CONCURRENT_UPLOADS && currentIndex < list.length){
     const chunk = list[currentIndex];
     activeTask++;
     currentIndex++;
@@ -53,19 +53,20 @@ async function uploadChunk(chunk){
     formData.append('file', chunk.file);
     formData.append('fileName', chunk.fileName);
     formData.append('chunkName', chunk.chunkName);
-await axios.post('/api/upload', formData, {
+try{
+  await axios.post('/api/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data' // 让 axios 自动设置 boundary
       }
-})
-.then(responses => {
- console.log(`第${chunk.index}切片上传成功`)
-  succeedTask--;
-})
-.catch(error => {
+});
+  console.log(`第${chunk.index}切片上传成功`)
+  succeedTask ++;
+}
+catch(error => {
   console.log(`第${chunk.index}切片上传失败`)
   failedTask ++;
-}).finally(() =>{
+})
+finally(() =>{
   activeTask --;
 });
 }
