@@ -35,17 +35,29 @@ async function uploadFile(list){
   let succeedTask = 0;
   let failedTask = 0;
   let currentIndex = 0;
-while(activeTask < MAX_CONCURRENT_UPLOADS && currentIndex < list.length){
+  processTask();
+  // 执行并发任务
+  function processTask(){
+    while(activeTask < MAX_CONCURRENT_UPLOADS && currentIndex < list.length){
     const chunk = list[currentIndex];
-    await uploadChunk(chunk);
     activeTask++;
     currentIndex++;
+    uploadChunk(chunk).then(() => {
+      succeedTask ++;
+    }).catch(()=>{
+      failedTask ++;
+    }).finally(()=>{
+      activeTask --;
+       if(succeedTask + failedTask === list.length){
+       // 所有请求成功完成
+      console.log('所有切片上传成功')
+      // 调用合并接口，通知服务端合并切片
+      mergeChunks();
+     }else{
+       processTask();
+     }
+    })
   }
-  if(succeedTask + failedTask === list.length){
-     // 所有请求成功完成
-     console.log('所有切片上传成功')
-     // 调用合并接口，通知服务端合并切片
-     mergeChunks();
   }
 // 上传单个分片
 async function uploadChunk(chunk){
@@ -60,37 +72,34 @@ try{
       }
 });
   console.log(`第${chunk.index}切片上传成功`)
-  succeedTask ++;
+  return true;
 }
-catch(error => {
+catch(error){
   console.log(`第${chunk.index}切片上传失败`)
-  failedTask ++;
-})
-finally(() =>{
-  activeTask --;
-});
+  return false;
+}
 }
 }
 
 function mergeChunks(){
   axios.post('/api/merge', {
     fileName: files.name,
-    total: uploadList.length
+    total: chunkList.length
   }).then().catch(error => {
     console.log('文件合并失败', error);
   })
 }
 
-upload.addEventListener(click => {
-  const uploadList = chunkList.map(({file}, index) => {
+upload.addEventListener('click', async() => {
+  const uploadList = chunkList.map(({file}, index) => ({
     file,
     fileName: file.name,
     chunkName: `${file.name}_${index}`,
     size: file.size
     index
-  })
+  });
   await uploadFile(uploadList);
-})
+});
 
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
