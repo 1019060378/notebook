@@ -3,14 +3,28 @@
 let input = document.getElementById('input');
 // 创建一个对象存储文件数据
 let files = {}
+// 存放切片的数据
+let chunkList = []
 input.addEventListener('change', (e) => {
   files = e.target.files[0];
+  // 调用创建切片
+  chunkList = createChunk(files);
+  // 调用上传切片
 })
 2.创建切片
-function createChunk(file, size){ // size切片大小2MB
-  
+// size是一个切片大小10MB
+let size = 10*1024*1024;
+function createChunk(file){ 
+  const chunkList = [];
+  let cur = 0;
+  while(cur < file.size){ // file.size有给定值，就进行替换
+    chunkList.push({
+      file: file.slice(cur, cur + size)
+    })
+    cur += size;
+  }
+  return chunkList;
 }
-
 
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
