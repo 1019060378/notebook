@@ -1,14 +1,17 @@
 代码
 1.js实现文件读取，监听input的change事件，获取文件size等信息备用
 import axios from 'axios';
-let input = document.getElementById('input');
-let upload = document.getElementById('upload');
+const input = document.getElementById('input');
+const upload = document.getElementById('upload');
 // 创建一个对象存储文件数据
 let files = {}
 // 存放切片的数据
 let chunkList = []
 // 一个切片大小10MB，单位是Byte
 const CHUNK_SIZE = 10 * 1024 *1024;
+// 最大并发任务为5个
+const MAX_CONCURRENT_UPLOADS = 5;
+// 监听文件选择
 input.addEventListener('change', (e) => {
   files = e.target.files[0];
   // 调用创建切片
@@ -26,19 +29,17 @@ function createChunk(file){
   }
   return chunkList;
 }
-3.上传切片
+3.上传切片（并发控制）
 async function uploadFile(list){
-  // 最大并发任务为5个
-  const MAX_CONCURRENT_UPLOADS = 5;
   let activeTask = 0;
   let succeedTask = 0;
   let failedTask = 0;
   let currentIndex = 0;
-  while(activeTask < MAX_CONCURRENT_UPLOADS && currentIndex < list.length){
+while(activeTask < MAX_CONCURRENT_UPLOADS && currentIndex < list.length){
     const chunk = list[currentIndex];
+    await uploadChunk(chunk);
     activeTask++;
     currentIndex++;
-    uploadChunk(chunk);
   }
   if(succeedTask + failedTask === list.length){
      // 所有请求成功完成
@@ -46,7 +47,6 @@ async function uploadFile(list){
      // 调用合并接口，通知服务端合并切片
      mergeChunks();
   }
-
 // 上传单个分片
 async function uploadChunk(chunk){
     const formData = new FormData();//创建表单类型数据
