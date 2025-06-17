@@ -35,7 +35,7 @@ async function uploadFile(list){
   const fileKey = generateFileKey(files);
   const total = list.length;
   // 请求服务端确认哪些分片已经上传过了
-  const serverUploaded = await checkExistingChunk(fileKey, total);
+  const serverUploaded = await checkExistingChunks(fileKey, total);
   // 获取localstorage本地存储的已上传切片
   const localUploaded =getUploadedChunks(fileKey);
   // 合并去重
@@ -112,11 +112,11 @@ function mergeChunks(){
   axios.post('/api/merge', {
     fileName: files.name,
     total: chunkList.length
-  }).then(
+  }).then(() => {
     console.log('合并成功');
     const fileKey = generateFileKey(files);
     clearUploadedChunks(fileKey); // 清除本地记录
-  ).catch(error => {
+  }).catch(error => {
     console.log('文件合并失败', error);
   })
 }
@@ -147,20 +147,20 @@ function setUploadedChunk(fileKey, index){
   const list = getUploadedChunks(fileKey);
   if(!list.includes(index)){
     list.push(index);
-    localStorge.setItem(key, JSON.stringify(list));
+    localStorage.setItem(key, JSON.stringify(list));
   }
 }
 function clearUploadedChunks(fileKey){
-  localStorge.remove(`uploadedChunks-${fileKey}`);
+  localStorage.remove(`uploadedChunks-${fileKey}`);
 }
 // 3.新增服务端接口，获取已上传的切片列表
-  async function checkExistingChunk(fileKey,total){
+  async function checkExistingChunks(fileKey,total){
     try{
       const res = await axios.post('/api/check',{
         fileName: fileKey,
         total
       });
-      return res.datat.uploaded || []; // 返回已上传的切片索引
+      return res.data.uploaded || []; // 返回已上传的切片索引
     }catch(error){
       console.warn(error);
       return [];
