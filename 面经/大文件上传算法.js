@@ -29,9 +29,26 @@ function createChunk(file){
   }
   return chunkList;
 }
-3.上传切片（并发控制）
+3.上传切片（并发控制）,添加逻辑过滤掉已上传的切片
 async function uploadFile(list){
   return new Promise((resolve,reject) =>{
+  const fileKey = generateFileKey(files);
+  const total = list.length;
+  // 请求服务端确认哪些分片已经上传过了
+  const serverUploaded = await checkExistingChunk(fileKey, total);
+  // 获取localstorage本地存储的已上传切片
+  const localUploaded =getUploadedChunks(fileKey);
+  // 合并去重
+  const uploadedSet = new Set([...serverUploaded, ...localUploaded]);
+  // 过滤出需要上传的切片
+  const needUploadList = list.filter((_, index) => !uploadedSet.has(index));
+  if(needUploadList.length === 0){
+    alert('文件已全部上传完成');
+    mergeChunks();
+    return;
+  }
+  console.log(`共上传${total}个切片，已上传${uploadedSet.size}，还需要上传${needUploadList.length}个切片`)
+    
   let activeTask = 0;
   let succeedTask = 0;
   let failedTask = 0;
@@ -41,10 +58,18 @@ async function uploadFile(list){
   function processTask(){
     while(activeTask < MAX_CONCURRENT_UPLOADS && currentIndex < list.length){
     const chunk = list[currentIndex];
+    const index = chunk.index;
+      // 跳过已上传的切片
+    if(uploadedSet.has(index)){
+      currentIndex ++;
+      succeedTask ++;
+      continue;
+    }
     activeTask++;
     currentIndex++;
     uploadChunk(chunk).then(() => {
       succeedTask ++;
+      setUploadedChunk(fileKey, index); // 标记为已上传
     }).catch(()=>{
       failedTask ++;
     }).finally(()=>{
@@ -89,6 +114,8 @@ function mergeChunks(){
     total: chunkList.length
   }).then(
     console.log('合并成功');
+    const fileKey = generateFileKey(files);
+    clearUploadedChunks(fileKey); // 清除本地记录
   ).catch(error => {
     console.log('文件合并失败', error);
   })
@@ -126,6 +153,19 @@ function setUploadedChunk(fileKey, index){
 function clearUploadedChunks(fileKey){
   localStorge.remove(`uploadedChunks-${fileKey}`);
 }
+// 3.新增服务端接口，获取已上传的切片列表
+  async function checkExistingChunk(fileKey,total){
+    try{
+      const res = await axios.post('/api/check',{
+        fileName: fileKey,
+        total
+      });
+      return res.datat.uploaded || []; // 返回已上传的切片索引
+    }catch(error){
+      console.warn(error);
+      return [];
+    }
+  }
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
 2.传输过程中网络波动
