@@ -127,7 +127,8 @@ upload.addEventListener('click', async() => {
     fileName: file.name,
     chunkName: `${file.name}_${index}`,
     size: file.size,
-    index
+    index,
+    retryCount: 0 //记录切片已重试次数
   });
   await uploadFile(uploadList);
 });
@@ -166,12 +167,28 @@ function clearUploadedChunks(fileKey){
       return [];
     }
   }
+  // 获取本地记录的重试次数
+  function getChunkRetry(fileKey, index){
+    const saved = localStorage.getItem(`chunkRetry-${fileKey}-${index}`);
+    return parseInt(saved, 10) || 0;
+  }
+  // 设置重试次数
+  function setChunkRetry(fileKey, index, count){
+    localStorage.setItem(`chunkRetry-${fileKey}-${index}`, count);
+  }
+  // 清除重试记录
+  function clearChunkRetries(fileKey){
+    for(let i = 0; i< allChunkLists[fileKey].length; i++){
+      localStorage.removeItem(`chunkRetry-${fileKey}-${i}`);
+    }
+  }
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
 2.传输过程中网络波动
 3.关机以后，想接着传，做不到
 
-可以支持断点续传(文件唯一标识 name+size，使用loacalStorage保存上传进度，通过服务端接口获取已上传切片，只上传未上传或失败的切片，上传完成后清理缓存)、断开重连重传、切片上传
+可以支持断点续传(文件唯一标识 name+size，使用loacalStorage保存上传进度，通过服务端接口获取已上传切片，只上传未上传或失败的切片，上传完成后清理缓存)、
+  断开重连重传（每个切片上传失败时自动重试N次，支持断网恢复后自动继续上传未完成的切片，使用localStorage记录上传状态和重试次数）、切片上传、支持多文件上传
 
 方案：
 -前端切片 chunk 2GB(2*1024 = 2048MB),每片10MB,总片数 const size = 2048 / 10
