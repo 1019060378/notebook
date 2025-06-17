@@ -67,22 +67,38 @@ async function uploadFile(list){
     }
     activeTask++;
     currentIndex++;
-    uploadChunk(chunk).then(() => {
-      succeedTask ++;
-      setUploadedChunk(fileKey, index); // 标记为已上传
-    }).catch(()=>{
-      failedTask ++;
-    }).finally(()=>{
+
+    const maxRetries = 3; // 最大重试次数
+    retryUpload(); // 开始上传或重试
+    async function retryUpload(){
+      try {
+        await uploadChunk(chunk);
+        succeedTask ++;
+        setUploadedChunk(fileKey, index); // 标记为已上传
+        localStorage.removeItem(`chunkRetry-${fileKey}-${index}`); // 成功后清除重传记录
+      } catch(err){
+        const currentRetry = getChunkRetry(fileKey, index);
+        if(currentRetry < maxRetries){
+          console.warn(`第${index}切片上传失败，正在尝试第${currentRetry+1}次重试`);
+          setChunkRetry(fileKey, index, currentRetry+1);
+          setTimeout(retryUpload, 2000); // 2秒后重试
+        }else{
+           console.warn(`第${index}切片上传失败，已达到最大重试次数`);
+           failedTask ++;
+        }
+      }.finally(()=>{
        activeTask --;
        if(succeedTask + failedTask === list.length){
        // 所有请求成功完成
       console.log('所有切片上传成功')
       // 调用合并接口，通知服务端合并切片
-      mergeChunks();
+       mergeChunks();
      }else{
        processTask();
      }
     })
+    }
+
   }
   }
 // 上传单个分片
@@ -116,6 +132,7 @@ function mergeChunks(){
     console.log('合并成功');
     const fileKey = generateFileKey(files);
     clearUploadedChunks(fileKey); // 清除本地记录
+    clearChunkRetries(fileKey); // 清除重试记录
   }).catch(error => {
     console.log('文件合并失败', error);
   })
