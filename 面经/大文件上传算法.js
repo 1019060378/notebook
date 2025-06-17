@@ -31,6 +31,7 @@ function createChunk(file){
 }
 3.上传切片（并发控制）
 async function uploadFile(list){
+  return new Promise((resolve,reject) =>{
   let activeTask = 0;
   let succeedTask = 0;
   let failedTask = 0;
@@ -80,6 +81,7 @@ catch(error){
 }
 }
 }
+})
 
 function mergeChunks(){
   axios.post('/api/merge', {
@@ -95,7 +97,7 @@ upload.addEventListener('click', async() => {
     file,
     fileName: file.name,
     chunkName: `${file.name}_${index}`,
-    size: file.size
+    size: file.size,
     index
   });
   await uploadFile(uploadList);
