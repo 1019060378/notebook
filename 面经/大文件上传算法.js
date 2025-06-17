@@ -4,9 +4,9 @@ import axios from 'axios';
 const input = document.getElementById('input');
 const upload = document.getElementById('upload');
 // 创建一个对象存储文件数据
-let files = {}
+let files = null;
 // 存放切片的数据
-let chunkList = []
+let chunkList = [];
 // 一个切片大小10MB，单位是Byte
 const CHUNK_SIZE = 10 * 1024 *1024;
 // 最大并发任务为5个
@@ -31,20 +31,20 @@ function createChunk(file){
 }
 3.上传切片（并发控制）,添加逻辑过滤掉已上传的切片
 async function uploadFile(list){
-  return new Promise((resolve,reject) =>{
+  return new Promise(async(resolve,reject) => {
   const fileKey = generateFileKey(files);
   const total = list.length;
   // 请求服务端确认哪些分片已经上传过了
   const serverUploaded = await checkExistingChunks(fileKey, total);
   // 获取localstorage本地存储的已上传切片
-  const localUploaded =getUploadedChunks(fileKey);
+  const localUploaded = getUploadedChunks(fileKey);
   // 合并去重
   const uploadedSet = new Set([...serverUploaded, ...localUploaded]);
   // 过滤出需要上传的切片
   const needUploadList = list.filter((_, index) => !uploadedSet.has(index));
   if(needUploadList.length === 0){
     alert('文件已全部上传完成');
-    mergeChunks();
+    mergeChunks(fileKey);
     return;
   }
   console.log(`共上传${total}个切片，已上传${uploadedSet.size}，还需要上传${needUploadList.length}个切片`)
@@ -86,19 +86,17 @@ async function uploadFile(list){
            console.warn(`第${index}切片上传失败，已达到最大重试次数`);
            failedTask ++;
         }
-      }.finally(()=>{
+      } finall {
        activeTask --;
        if(succeedTask + failedTask === list.length){
        // 所有请求成功完成
       console.log('所有切片上传成功')
       // 调用合并接口，通知服务端合并切片
-       mergeChunks();
+       mergeChunks(fileKey);
      }else{
        processTask();
      }
-    })
     }
-
   }
   }
 // 上传单个分片
@@ -124,13 +122,12 @@ catch(error){
 }
 })
 
-function mergeChunks(){
+function mergeChunks(fileKey){
   axios.post('/api/merge', {
     fileName: files.name,
     total: chunkList.length
   }).then(() => {
     console.log('合并成功');
-    const fileKey = generateFileKey(files);
     clearUploadedChunks(fileKey); // 清除本地记录
     clearChunkRetries(fileKey); // 清除重试记录
   }).catch(error => {
@@ -169,7 +166,7 @@ function setUploadedChunk(fileKey, index){
   }
 }
 function clearUploadedChunks(fileKey){
-  localStorage.remove(`uploadedChunks-${fileKey}`);
+  localStorage.removeItem(`uploadedChunks-${fileKey}`);
 }
 // 3.新增服务端接口，获取已上传的切片列表
   async function checkExistingChunks(fileKey,total){
@@ -195,10 +192,11 @@ function clearUploadedChunks(fileKey){
   }
   // 清除重试记录
   function clearChunkRetries(fileKey){
-    for(let i = 0; i< allChunkLists[fileKey].length; i++){
+    for(let i = 0; i< chunkList.length; i++){
       localStorage.removeItem(`chunkRetry-${fileKey}-${i}`);
     }
   }
+  
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
 2.传输过程中网络波动
