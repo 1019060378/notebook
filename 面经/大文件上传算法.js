@@ -29,7 +29,7 @@ function createChunk(file){
   }
   return chunkList;
 }
-3.上传切片（并发控制）,添加逻辑过滤掉已上传的切片
+3.上传切片（并发控制、断点上传）,添加逻辑过滤掉已上传的切片
 async function uploadFile(list){
   return new Promise(async(resolve,reject) => {
   const fileKey = generateFileKey(files);
