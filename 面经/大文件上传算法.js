@@ -48,7 +48,7 @@ async function uploadFile(list){
     }).catch(()=>{
       failedTask ++;
     }).finally(()=>{
-      activeTask --;
+       activeTask --;
        if(succeedTask + failedTask === list.length){
        // 所有请求成功完成
       console.log('所有切片上传成功')
@@ -87,7 +87,9 @@ function mergeChunks(){
   axios.post('/api/merge', {
     fileName: files.name,
     total: chunkList.length
-  }).then().catch(error => {
+  }).then(
+    console.log('合并成功');
+  ).catch(error => {
     console.log('文件合并失败', error);
   })
 }
@@ -103,12 +105,33 @@ upload.addEventListener('click', async() => {
   await uploadFile(uploadList);
 });
 
+// 添加断点续传
+// 1.使用文件名+size做简单标识（生产环境建议用MD5）
+function generateFileKey(file){
+  return `${file.name}-${file.size}`;
+}
+// 2.使用localstorage记录已上传的切片索引
+function getUploadedChunks(fileKey){
+  const saved = localStorage.getItem(`uploadedChunks-${fileKey}`);
+  return saved ? JSON.parse(saved) : []
+}
+function setUploadedChunk(fileKey, index){
+  const key = `uploadedChunks-${fileKey}`;
+  const list = getUploadedChunks(fileKey);
+  if(!list.includes(index)){
+    list.push(index);
+    localStorge.setItem(key, JSON.stringify(list));
+  }
+}
+function clearUploadedChunks(fileKey){
+  localStorge.remove(`uploadedChunks-${fileKey}`);
+}
 背景：之前做智能分析助手，基于盘古大模型实现的，会涉及到用户上传自定义模型（1G以上），会遇到的问题：
 1.传输时间比较长，网络断开之后，之前传输的没了
 2.传输过程中网络波动
 3.关机以后，想接着传，做不到
 
-可以支持断点续传、断开重连重传、切片上传
+可以支持断点续传(文件唯一标识 name+size，使用loacalStorage保存上传进度，通过服务端接口获取已上传切片，只上传未上传或失败的切片，上传完成后清理缓存)、断开重连重传、切片上传
 
 方案：
 -前端切片 chunk 2GB(2*1024 = 2048MB),每片10MB,总片数 const size = 2048 / 10
