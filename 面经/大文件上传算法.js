@@ -86,7 +86,7 @@ async function uploadFile(list){
            console.warn(`第${index}切片上传失败，已达到最大重试次数`);
            failedTask ++;
         }
-      } finall {
+      } finally {
        activeTask --;
        if(succeedTask + failedTask === list.length){
        // 所有请求成功完成
@@ -114,13 +114,14 @@ try{
   console.log(`第${chunk.index}切片上传成功`)
   return true;
 }
-catch(error){
+ catch(error){
   console.log(`第${chunk.index}切片上传失败`)
   return false;
-}
+ }
 }
 }
 })
+}
 
 function mergeChunks(fileKey){
   axios.post('/api/merge', {
@@ -143,7 +144,7 @@ upload.addEventListener('click', async() => {
     size: file.size,
     index,
     retryCount: 0 //记录切片已重试次数
-  });
+  }));
   await uploadFile(uploadList);
 });
 
