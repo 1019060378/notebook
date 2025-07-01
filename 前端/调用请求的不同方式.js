@@ -18,7 +18,7 @@ xsl.onreadystatechange = function(){
     }  
 }  
   
-2.封装的axios请求  
+2.axios请求  
 npm install axios安装依赖，js文件里直接import引入  
 async fuction request(){
     const ins = axios.create({
@@ -55,3 +55,21 @@ async fuction request(){
         return res;
     })
 }
+
+3.Fetch API
+fetch('http://test.com/get?name=test&&id=1').then(response => response.json()).then(res => {
+    console.log(res);
+})
+
+fetch('http://test.com/post',{
+    methods: 'POST',
+    headers: {
+        'Content-Type', 'application/json'
+    },
+    body: JSON.stringify({
+        name: 'test',
+        id: '1'
+    })
+}).then(response => response.json()).then(res => {
+    console.log(res);
+})
