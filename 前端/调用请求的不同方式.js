@@ -20,19 +20,38 @@ xsl.onreadystatechange = function(){
   
 2.封装的axios请求  
 npm install axios安装依赖，js文件里直接import引入  
-const res = await axios.get('http://test.com/get', {  
-  params:{  
-    name: 'test',  
-    id: '1'  
-  }  
-});  
-console.log(res.data)  
-  
-//post方法不用写params，直接写  
-axios.post('http://test.com/post', {  
-    name: 'test',  
-    id: '1'  
-  }).then(data =>   
-     console.log(data)  
-  ).catch(error =>   
-     console.log(error));  
+async fuction request(){
+    const ins = axios.create({
+        baseURL: 'http://test.com'
+    })
+    const res = await ins.get('/get', {  
+      params:{  
+        name: 'test',  
+        id: '1'  
+      }  
+    });  
+    console.log(res.data)  
+      
+    //post方法不用写params，直接写  
+    ins.post('/post', {  
+        name: 'test',  
+        id: '1'  
+      }).then(data =>   
+         console.log(data)  
+      ).catch(error =>   
+         console.log(error));  
+
+    // 拦截器
+    // 1.request 中断请求
+    ins.interceptors.request.use(config => {
+        // 处理鉴权等
+        // 继续发送
+        return config;
+    })
+    // 2.response 对响应内容预处理
+    ins.interceptors.response.use(res => {
+        // 预处理
+        // 发送处理后的结果
+        return res;
+    })
+}
