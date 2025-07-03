@@ -1,0 +1,245 @@
+​
+单一应用：
+
+一、angular的: host ::ng-deep配合精准类名
+
+使用::ngdeep引起的样式污染：根目录在ng-deep前加:host，子目录增加classname使指向更明确
+
+二、vue的<style scoped>
+
+通用方案：
+
+三、 给每个页面样式添加独特前缀（如页面名、组件名），避免冲突
+
+四、手动配置webpack，可以自定义配置更灵活:
+
+1.CSS Modules不依赖框架，类名哈希化
+
+（1）安装css-loader、style-loader依赖
+
+（2）webpack.config.jd里配置module.rules里针对css文件的test规则的use数组添加['style-loader', 'css-loader']
+
+rules: [
+  {
+    test: /\.css$/,
+    use: [
+      'style-loader', // 不需要额外配置时，直接写字符串
+      { 
+        loader: 'css-loader', // 需配置时，写成对象
+        options: { 
+          modules: true, // 启用 CSS Modules
+          localIdentName: '[name]__[local]--[hash:5]' // 自定义类名格式
+        } 
+      }
+    ]
+  }
+]
+(3)js里引入 import styles from './style.css'
+
+在html里使用 <div class="${style.box}"></div>
+
+原理：
+
+css-loader  
+
+输入：css文件 
+
+处理：fs去读取css文件里的内容，fs readline/ fs readfile，ast解析后需要做key的处理，变为hash直接输出，并且return 一个import需要用到的对应Key map
+
+输出：给style-loader去用
+
+style-loader
+
+输入：字符串，用来放在style标签里面的
+
+输出：js代码-加载一个style标签到html的header上
+
+2.vue框架：配合vue-loader+<style scoped>样式只作用于当前组件
+
+(1)安装vue-loader、css-loader、style-loader依赖
+
+(2)webpack配置
+
+const { VueLoaderPlugin } = require('vue-loader');
+
+module.exports = {
+  module: {
+    rules: [
+      {
+        test: /\.vue$/,
+        loader: 'vue-loader', // 关键：解析 .vue 文件
+      },
+      // 处理 Vue 单文件中的 CSS（scoped 由 vue-loader 自动处理）
+      {
+        test: /\.css$/,
+        use: ['vue-style-loader', 'css-loader'], // 注意使用 vue-style-loader 而非 style-loader
+      },
+      // 处理 SCSS（如需）
+      {
+        test: /\.scss$/,
+        use: ['vue-style-loader', 'css-loader', 'sass-loader'],
+      },
+    ],
+  },
+  plugins: [
+    new VueLoaderPlugin(), // 必须添加，配合 vue-loader 工作
+  ],
+};
+(3) 在.vue文件里直接使用<style scoped>
+
+vue-loader解析.vue文件，其他和webpack一样
+
+五、css-in-js
+
+(1)通过style-components动态生成样式并附加到元素上，可以生成唯一的样式标识名
+
+jsx文件
+
+import styled from 'styled-components';
+const StyledButton = styled.button`
+  color: blue;
+  padding: 8px;
+`;
+// 使用时直接渲染，样式自动生效
+const Button = () => <StyledButton>点击我</StyledButton>;
+(2)redium可以写为伪类或media媒体查询
+
+import React from 'react';
+import Radium from 'radium';
+
+const StyledButton = ({ children }) => {
+  // 定义带伪类和媒体查询的样式
+  const styles = {
+    base: {
+      color: 'white',
+      padding: '10px 20px',
+      borderRadius: 4,
+      // 伪类
+      ':hover': {
+        background: 'darkblue',
+      },
+      // 媒体查询
+      '@media (max-width: 768px)': {
+        padding: '5px 10px',
+      },
+    },
+    primary: {
+      background: 'blue',
+    },
+    secondary: {
+      background: 'gray',
+    },
+  };
+
+  return (
+    <button style={{ ...styles.base, ...styles.primary }}>
+      {children}
+    </button>
+  );
+};
+
+// 用 Radium 包装组件，使其支持增强样式
+export default Radium(StyledButton);
+跨应用场景：
+
+微前端：解决主应用和子应用之间，或者不同子应用之间的样式隔离问题
+
+主应用和子应用使用了相同的框架，多数元素的class类名相同，子应用与主应用样式隔离不彻底，会导致页面样式错乱
+
+微前端样式隔离详情
+
+（1）使用插件转换微应用class的前缀名称
+
+change-prefix-loader 或 postcss-change-css-prefix和替换子应用中的class前缀，使每个应用都带上自己独特的类名
+
+（2）使用qiankun自带的沙箱隔离
+
+在主应用中start函数中，通过配置sandbox做到样式隔离
+
+start({
+   sandbox: {
+     // 开启严格的样式隔离模式。这种模式下 qiankun 会为每个微应用的容器包裹上一个 [shadow dom]节点，从而确保微应用的样式不会对全局造成影响。
+     strictStyleIsolation: true,
+     // 设置实验性的样式隔离特性，即在子应用下面的样式都会包一个特殊的选择器规则来限定其影响范围
+     experimentalStyleIsolation: true
+   }
+})
+坑：动态类的弹窗样式丢失。
+
+(3)方案三：使用qiankun自带的experimentalStyleIsolation实验性的样式隔离的同时，在子应用的main.js中重写document.body.appendChild的方法
+
+在主应用start里配置experimentalStyleIsolation: true同时，解决弹窗因挂载在主应用的body而脱离子应用导致样式丢失的问题，在子应用的main.js中重写document.body.appendChild的方法，让弹窗样式不挂载在主应用body，而是挂载到子应用自身的根节点下，避免脱离子应用
+
+let instance = null
+// 初始的document.body.appendChild事件
+const originFn = document.body.appendChild.bind(document.body)
+
+function render(props = {}) {
+  const { container } = props
+  // 每次渲染的时候调用redirectPopup事件
+  redirectPopup(props)
+  instance = new Vue({
+    router,
+    store,
+    render: (h) => h(App)
+  }).$mount(container ? container.querySelector('#app') : '#app')
+}
+
+if (!window.__POWERED_BY_QIANKUN__) {
+  render(document)
+}
+
+export async function mount(props) {
+  const currentApp = getStorage('currentApp')
+  if (currentApp) {
+    store.commit('app/SET_CURRENTAPP', currentApp)
+  }
+  props.onGlobalStateChange((state) => {
+    // 监听状态变更
+    if (state.currentApp) {
+      store.commit('app/SET_CURRENTAPP', state.currentApp)
+    }
+  })
+  render(props)
+}
+
+function redirectPopup(container) {
+  // 子应用中需要挂载到子应用的弹窗className。样式class白名单，用子应用的样式。
+  const whiteList = ['el-select-dropdown', 'el-popper', 'el-popover', 'el-dialog__wrapper']
+
+  // 保存原有document.body.appendChild方法
+  const originFn = document.body.appendChild.bind(document.body)
+
+  // 重写appendChild方法
+  document.body.appendChild = (dom) => {
+    // 根据标记，来区分是否用新的挂载方式
+    let count = 0
+    whiteList.forEach((x) => {
+      if (dom.className.includes(x)) count++
+    })
+    if (count > 0 && container.container) {
+      // 有弹出框的时候，挂载的元素挂载到子应用上，而不是主应用的body上
+      container.container.querySelector('#app').appendChild(dom)
+    } else {
+      originFn(dom)
+    }
+  }
+}
+
+/**
+ * 之所以要标记使用和还原document.body.appendChild方法，
+ * 是因为主应用和子应用中有很多组件都用到了这个方法，比如select，日历组件。
+ * 不还原这个方法的话，这些组件的样式会受到破坏。
+ */
+export async function unmount() {
+  instance.$destroy()
+  instance.$el.innerHTML = ''
+  instance = null
+  instance?.unmount?.()
+  instance = null
+  history?.destroy?.()
+  document.body.appendChild = originFn
+}
+解决了样式隔离和动态弹窗丢失样式的问题
+
+​
